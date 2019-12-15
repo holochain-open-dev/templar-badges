@@ -1,66 +1,406 @@
-/// NB: The try-o-rama config patterns are still not quite stabilized.
-/// See the try-o-rama README [https://github.com/holochain/try-o-rama]
-/// for a potentially more accurate example
+const path = require("path");
+const tape = require("tape");
 
-const path = require('path')
-const tape = require('tape')
+const {
+  Orchestrator,
+  Config,
+  tapeExecutor,
+  localOnly,
+  combine
+} = require("@holochain/tryorama");
 
-const { Orchestrator, Config, tapeExecutor, singleConductor, combine  } = require('@holochain/tryorama')
-
-process.on('unhandledRejection', error => {
+process.on("unhandledRejection", error => {
   // Will print "unhandledRejection err is not defined"
-  console.error('got unhandledRejection:', error);
+  console.error("got unhandledRejection:", error);
 });
 
-const dnaPath = path.join(__dirname, "../dist/hc-badges.dna.json")
+const dnaPath = path.join(__dirname, "../dist/dna.dna.json");
 
-const orchestrator = new Orchestrator({
-  middleware: combine(
-    // squash all instances from all conductors down into a single conductor,
-    // for in-memory testing purposes.
-    // Remove this middleware for other "real" network types which can actually
-    // send messages across conductors
-    singleConductor,
+const orchestrator = new Orchestrator();
 
-    // use the tape harness to run the tests, injects the tape API into each scenario
-    // as the second argument
-    tapeExecutor(require('tape'))
-  ),
-
-  globalConfig: {
-    logger: true,
-    network: 'memory',  // must use singleConductor middleware if using in-memory network
+const mainConfig = Config.gen(
+  {
+    badges_instance: Config.dna(dnaPath, "scaffold-test")
   },
-
-  // the following are optional:
-
-  waiter: {
-    softTimeout: 5000,
-    hardTimeout: 10000,
-  },
-})
-
-const conductorConfig = {
-  instances: {
-    myInstanceName: Config.dna(dnaPath, 'scaffold-test')
+  {
+    network: {
+      type: "sim2h",
+      sim2h_url: "ws://localhost:9000"
+    }
   }
-}
+);
 
-orchestrator.registerScenario("description of example test", async (s, t) => {
+orchestrator.registerScenario(
+  "create badge class, make a badge claim for another agent, have that agent create the badge assertion",
+  async (s, t) => {
+    const { alice, bob } = await s.players(
+      {
+        alice: mainConfig,
+        bob: mainConfig
+      },
+      true
+    );
 
-  const {alice, bob} = await s.players({alice: conductorConfig, bob: conductorConfig})
+    const aliceAddress = alice.instance("badges_instance").agentAddress;
+    const bobAddress = bob.instance("badges_instance").agentAddress;
 
-  // Make a call to a Zome function
-  // indicating the function, and passing it an input
-  const addr = await alice.call("myInstanceName", "my_zome", "create_my_entry", {"entry" : {"content":"sample content"}})
+    const addr = await alice.call(
+      "badges_instance",
+      "badges",
+      "create_badge_class",
+      {
+        name: "Test badge",
+        description: "Test description",
+        image: "Test image",
+        validators: 2
+      }
+    );
 
-  // Wait for all network activity to
-  await s.consistency()
+    await s.consistency();
 
-  const result = await alice.call("myInstanceName", "my_zome", "get_my_entry", {"address": addr.Ok})
+    let result = await alice.call("badges_instance", "badges", "get_entry", {
+      address: addr.Ok
+    });
 
-  // check for equality of the actual and expected results
-  t.deepEqual(result, { Ok: { App: [ 'my_entry', '{"content":"sample content"}' ] } })
-})
+    const badgeClass = JSON.parse(result.Ok.App[1]);
+    t.deepEqual(badgeClass, {
+      name: "Test badge",
+      description: "Test description",
+      image: "Test image",
+      creator_address: aliceAddress,
+      validators: 2
+    });
 
-orchestrator.run()
+    result = await alice.call(
+      "badges_instance",
+      "badges",
+      "get_all_badge_classes",
+      {}
+    );
+
+    const allBadges = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
+    t.deepEqual(allBadges, [
+      {
+        name: "Test badge",
+        description: "Test description",
+        image: "Test image",
+        creator_address: aliceAddress,
+        validators: 2
+      }
+    ]);
+
+    const claimAddr = await alice.call(
+      "badges_instance",
+      "badges",
+      "create_badge_claim",
+      {
+        recipient: bobAddress,
+        badge_class: addr.Ok,
+        evidences: []
+      }
+    );
+
+    await s.consistency();
+
+    result = await alice.call("badges_instance", "badges", "get_entry", {
+      address: claimAddr.Ok
+    });
+
+    const badgeClaim = JSON.parse(result.Ok.App[1]);
+    t.deepEqual(badgeClaim, {
+      recipient: bobAddress,
+      badge_class: addr.Ok,
+      issuer: aliceAddress,
+      evidences: []
+    });
+
+    result = await alice.call(
+      "badges_instance",
+      "badges",
+      "get_badge_class_claims",
+      {
+        badge_class: addr.Ok
+      }
+    );
+
+    let badgeClaims = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
+    t.deepEqual(badgeClaims, [
+      {
+        recipient: bobAddress,
+        badge_class: addr.Ok,
+        issuer: aliceAddress,
+        evidences: []
+      }
+    ]);
+
+    const assertionAddr = await bob.call(
+      "badges_instance",
+      "badges",
+      "create_own_badge_assertion",
+      {
+        badge_class: addr.Ok
+      }
+    );
+
+    await s.consistency();
+
+    result = await bob.call("badges_instance", "badges", "get_entry", {
+      address: assertionAddr.Ok
+    });
+
+    const badgeAssertion = JSON.parse(result.Ok.App[1]);
+    t.deepEqual(badgeAssertion, {
+      recipient: bobAddress,
+      badge_class: addr.Ok
+    });
+
+    result = await alice.call(
+      "badges_instance",
+      "badges",
+      "get_badge_class_assertions",
+      {
+        badge_class: addr.Ok
+      }
+    );
+
+    let badgeAssertions = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
+    t.deepEqual(badgeAssertions, [
+      {
+        recipient: aliceAddress,
+        badge_class: addr.Ok
+      },
+      {
+        recipient: bobAddress,
+        badge_class: addr.Ok
+      }
+    ]);
+
+    result = await alice.call(
+      "badges_instance",
+      "badges",
+      "get_badge_assertions_to_recipient",
+      {
+        agent_address: bobAddress
+      }
+    );
+
+    badgeAssertions = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
+    t.deepEqual(badgeAssertions, [
+      {
+        recipient: bobAddress,
+        badge_class: addr.Ok
+      }
+    ]);
+
+    result = await alice.call(
+      "badges_instance",
+      "badges",
+      "get_badge_claims_from_issuer",
+      {
+        agent_address: aliceAddress
+      }
+    );
+
+    badgeClaims = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
+    t.deepEqual(badgeClaims, [
+      {
+        recipient: bobAddress,
+        badge_class: addr.Ok,
+        issuer: aliceAddress,
+        evidences: []
+      }
+    ]);
+
+    result = await alice.call(
+      "badges_instance",
+      "badges",
+      "get_badge_claims_to_recipient",
+      {
+        agent_address: bobAddress
+      }
+    );
+
+    badgeClaims = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
+    t.deepEqual(badgeClaims, [
+      {
+        recipient: bobAddress,
+        badge_class: addr.Ok,
+        issuer: aliceAddress,
+        evidences: []
+      }
+    ]);
+  }
+);
+
+orchestrator.registerScenario(
+  "validation via social triangulation",
+  async (s, t) => {
+    const { alice, bob, carol, dave } = await s.players(
+      {
+        alice: mainConfig,
+        bob: mainConfig,
+        carol: mainConfig,
+        dave: mainConfig
+      },
+      true
+    );
+
+    const aliceAddress = alice.instance("badges_instance").agentAddress;
+    const bobAddress = bob.instance("badges_instance").agentAddress;
+    const carolAddress = carol.instance("badges_instance").agentAddress;
+    const daveAddress = dave.instance("badges_instance").agentAddress;
+
+    console.log(
+      "addresses",
+      aliceAddress,
+      bobAddress,
+      carolAddress,
+      daveAddress
+    );
+
+    const addr = await alice.call(
+      "badges_instance",
+      "badges",
+      "create_badge_class",
+      {
+        name: "Test badge",
+        description: "Test description",
+        image: "Test image",
+        validators: 2
+      }
+    );
+
+    await s.consistency();
+
+    let error = await dave.call(
+      "badges_instance",
+      "badges",
+      "create_badge_claim",
+      {
+        recipient: bobAddress,
+        badge_class: addr.Ok,
+        evidences: []
+      }
+    );
+    t.notOk(error.Ok);
+
+    error = await bob.call(
+      "badges_instance",
+      "badges",
+      "create_own_badge_assertion",
+      {
+        badge_class: addr.Ok
+      }
+    );
+
+    t.notOk(error.Ok);
+
+    let result = await alice.call(
+      "badges_instance",
+      "badges",
+      "create_badge_claim",
+      {
+        recipient: bobAddress,
+        badge_class: addr.Ok,
+        evidences: []
+      }
+    );
+    t.ok(result.Ok);
+
+    await s.consistency();
+    await s.consistency();
+
+    result = await bob.call(
+      "badges_instance",
+      "badges",
+      "create_own_badge_assertion",
+      {
+        badge_class: addr.Ok
+      }
+    );
+    t.ok(result.Ok);
+
+    result = await alice.call(
+      "badges_instance",
+      "badges",
+      "create_badge_claim",
+      {
+        recipient: carolAddress,
+        badge_class: addr.Ok,
+        evidences: []
+      }
+    );
+
+    t.ok(result.Ok);
+
+    await s.consistency();
+
+    result = await carol.call(
+      "badges_instance",
+      "badges",
+      "create_own_badge_assertion",
+      {
+        badge_class: addr.Ok
+      }
+    );
+    t.ok(result.Ok);
+
+    await s.consistency();
+
+    result = await bob.call("badges_instance", "badges", "create_badge_claim", {
+      recipient: daveAddress,
+      badge_class: addr.Ok,
+      evidences: []
+    });
+    t.ok(result.Ok);
+
+    await s.consistency();
+
+    result = await carol.call(
+      "badges_instance",
+      "badges",
+      "create_badge_claim",
+      {
+        recipient: daveAddress,
+        badge_class: addr.Ok,
+        evidences: []
+      }
+    );
+    t.ok(result.Ok);
+
+    await s.consistency();
+
+    result = await dave.call(
+      "badges_instance",
+      "badges",
+      "get_badge_claims_to_recipient",
+      {
+        agent_address: daveAddress
+      }
+    );
+    const badgeClaims = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
+    t.equal(badgeClaims.length, 2);
+
+    const triangulationResult = await dave.call(
+      "badges_instance",
+      "badges",
+      "create_own_badge_assertion",
+      {
+        badge_class: addr.Ok
+      }
+    );
+    await s.consistency();
+
+    result = await dave.call("badges_instance", "badges", "get_entry", {
+      address: triangulationResult.Ok
+    });
+
+    const badgeAssertion = JSON.parse(result.Ok.App[1]);
+    t.deepEqual(badgeAssertion, {
+      recipient: daveAddress,
+      badge_class: addr.Ok
+    });
+  }
+);
+
+orchestrator.run();
