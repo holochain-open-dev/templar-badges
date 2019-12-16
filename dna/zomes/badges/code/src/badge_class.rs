@@ -58,14 +58,14 @@ pub fn entry_def() -> ValidatingEntryType {
 
                     if !validation_data.clone().sources().contains(&creator_address) {
                         return Err(format!(
-                            "The creator {} of badge class {} must sign its creation, sources {:?}", 
+                            "The creator {} of badge class {} must sign its creation, sources {:?}",
                             creator_address,
                             validation_data.package.chain_header.entry_address(),
                             validation_data.sources()
                         ));
                     }
 
-                    Ok(())
+                   Ok(())
                 },
                 _ => Err(String::from("Cannot update or delete a badge class")),
             }

@@ -22,6 +22,10 @@ pub fn entry_def() -> ValidatingEntryType {
         validation: |validation_data: hdk::EntryValidationData<BadgeClaim>| {
             match validation_data {
                 EntryValidationData::Create {  validation_data, entry } => {
+                    if entry.recipient == entry.issuer {
+                        return Err(String::from("Claim recipient and issuer must be different"));
+                    }
+
                     let entries = get_package_entries(&validation_data.package)?;
 
                     let author = get_chain_agent_id(&entries)?;

@@ -33,10 +33,11 @@ const mainConfig = Config.gen(
 orchestrator.registerScenario(
   "create badge class, make a badge claim for another agent, have that agent create the badge assertion",
   async (s, t) => {
-    const { alice, bob } = await s.players(
+    const { alice, bob, carol } = await s.players(
       {
         alice: mainConfig,
-        bob: mainConfig
+        bob: mainConfig,
+        carol: mainConfig,
       },
       true
     );
@@ -144,6 +145,8 @@ orchestrator.registerScenario(
 
     await s.consistency();
 
+    console.log("iaaa", assertionAddr);
+
     result = await bob.call("badges_instance", "badges", "get_entry", {
       address: assertionAddr.Ok
     });
@@ -231,7 +234,7 @@ orchestrator.registerScenario(
     ]);
   }
 );
-
+ 
 orchestrator.registerScenario(
   "validation via social triangulation",
   async (s, t) => {
@@ -249,14 +252,6 @@ orchestrator.registerScenario(
     const bobAddress = bob.instance("badges_instance").agentAddress;
     const carolAddress = carol.instance("badges_instance").agentAddress;
     const daveAddress = dave.instance("badges_instance").agentAddress;
-
-    console.log(
-      "addresses",
-      aliceAddress,
-      bobAddress,
-      carolAddress,
-      daveAddress
-    );
 
     const addr = await alice.call(
       "badges_instance",
@@ -284,6 +279,8 @@ orchestrator.registerScenario(
     );
     t.notOk(error.Ok);
 
+    await s.consistency();
+
     error = await bob.call(
       "badges_instance",
       "badges",
@@ -294,6 +291,7 @@ orchestrator.registerScenario(
     );
 
     t.notOk(error.Ok);
+    await s.consistency();
 
     let result = await alice.call(
       "badges_instance",
@@ -308,7 +306,6 @@ orchestrator.registerScenario(
     t.ok(result.Ok);
 
     await s.consistency();
-    await s.consistency();
 
     result = await bob.call(
       "badges_instance",
@@ -319,6 +316,8 @@ orchestrator.registerScenario(
       }
     );
     t.ok(result.Ok);
+
+    await s.consistency();
 
     result = await alice.call(
       "badges_instance",
@@ -381,6 +380,8 @@ orchestrator.registerScenario(
     const badgeClaims = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
     t.equal(badgeClaims.length, 2);
 
+    await s.consistency();
+
     const triangulationResult = await dave.call(
       "badges_instance",
       "badges",
@@ -401,6 +402,6 @@ orchestrator.registerScenario(
       badge_class: addr.Ok
     });
   }
-);
+); 
 
 orchestrator.run();

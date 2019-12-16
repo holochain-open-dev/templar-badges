@@ -12,7 +12,7 @@ test_agent = true
 
 [[dnas]]
 file = '/home/guillem/projects/holochain/hc-badges/dna/dist/dna.dna.json'
-hash = 'QmNRr24eF3MNoniTXYUHF7faZABcXEeRe3a576orMuAwJ1'
+hash = 'QmXibUKYVFzjdV6kkCSvsQuzu4rvEBvhYzjnnBCnfcZnRx'
 id = 'hc-run-dna'
 
 [[instances]]
@@ -31,7 +31,7 @@ id = 'websocket-interface'
 id = 'test-instance'
 
 [interfaces.driver]
-port = 8889
+port = 8888
 type = 'websocket'
 
 [logger]
@@ -45,7 +45,7 @@ rules = []
 bootstrap_nodes = []
 n3h_log_level = 'i'
 n3h_mode = 'REAL'
-n3h_persistence_path = '/tmp/tmp.j1hQUFs7Vn'
+n3h_persistence_path = '/tmp/tmp.Ude7YWICbR'
 type = 'n3h'
 
 [passphrase_service]

@@ -223,13 +223,13 @@ pub fn commit_all_claims(badge_class: &Address) -> ZomeApiResult<()> {
 
 pub fn commit_with_provenances(entry: GetEntryResult) -> ZomeApiResult<()> {
     if let GetEntryResultType::Single(entry_result) = entry.result {
-        let entry = entry_result.entry.unwrap();
+        let entry = entry_result.clone().entry.unwrap();
         let provenances: Vec<Provenance> = entry_result
             .headers
             .iter()
             .flat_map(|header| header.provenances().clone())
             .collect();
-        hdk::debug(format!("huhuhu1 {:?}", entry))?;
+        hdk::debug(format!("huhuhu1 {:?}", entry_result))?;
         hdk::debug(format!("huhuhu2 {:?}", provenances))?;
         hdk::commit_entry_result(&entry, CommitEntryOptions::new(provenances))?;
         Ok(())
