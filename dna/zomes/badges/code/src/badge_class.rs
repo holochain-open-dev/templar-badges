@@ -53,8 +53,8 @@ pub fn entry_def() -> ValidatingEntryType {
         },
         validation: |validation_data: hdk::EntryValidationData<BadgeClass>| {
             match validation_data {
-                EntryValidationData::Create { entry, validation_data } => {
-                    let creator_address = entry.creator_address;
+                EntryValidationData::Create { .. } => {
+/*                     let creator_address = entry.creator_address;
 
                     if !validation_data.clone().sources().contains(&creator_address) {
                         return Err(format!(
@@ -64,7 +64,7 @@ pub fn entry_def() -> ValidatingEntryType {
                             validation_data.sources()
                         ));
                     }
-
+ */
                    Ok(())
                 },
                 _ => Err(String::from("Cannot update or delete a badge class")),
@@ -72,8 +72,8 @@ pub fn entry_def() -> ValidatingEntryType {
         },
         links: [
             to!(
-                "badge_claim",
-                link_type: "badge_class->badge_claim",
+                "badge",
+                link_type: "badge_class->badge",
                 validation_package: || {
                     hdk::ValidationPackageDefinition::Entry
                 },
@@ -84,9 +84,9 @@ pub fn entry_def() -> ValidatingEntryType {
                     }
                 }
             ),
-            to!(
-                "badge_assertion",
-                link_type: "badge_class->badge_assertion",
+            from!(
+                "%agent_id",
+                link_type: "creator->badge_class",
                 validation_package: || {
                     hdk::ValidationPackageDefinition::Entry
                 },
@@ -99,4 +99,17 @@ pub fn entry_def() -> ValidatingEntryType {
             )
         ]
     )
+}
+
+pub fn commit_badge_class(badge_class: &Address) -> ZomeApiResult<()> {
+    match hdk::get_entry(badge_class)? {
+        None => Err(ZomeApiError::from(format!(
+            "No badge found for the received address {}",
+            badge_class
+        ))),
+        Some(entry) => {
+            hdk::commit_entry(&entry)?;
+            Ok(())
+        }
+    }
 }

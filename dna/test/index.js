@@ -37,7 +37,7 @@ orchestrator.registerScenario(
       {
         alice: mainConfig,
         bob: mainConfig,
-        carol: mainConfig,
+        carol: mainConfig
       },
       true
     );
@@ -63,6 +63,7 @@ orchestrator.registerScenario(
       address: addr.Ok
     });
 
+
     const badgeClass = JSON.parse(result.Ok.App[1]);
     t.deepEqual(badgeClass, {
       name: "Test badge",
@@ -72,12 +73,15 @@ orchestrator.registerScenario(
       validators: 2
     });
 
+    await s.consistency();
+
     result = await alice.call(
       "badges_instance",
       "badges",
       "get_all_badge_classes",
       {}
     );
+    console.log("hihi1", result);
 
     const allBadges = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
     t.deepEqual(allBadges, [
@@ -93,7 +97,7 @@ orchestrator.registerScenario(
     const claimAddr = await alice.call(
       "badges_instance",
       "badges",
-      "create_badge_claim",
+      "claim_user_deserves_badge",
       {
         recipient: bobAddress,
         badge_class: addr.Ok,
@@ -107,37 +111,37 @@ orchestrator.registerScenario(
       address: claimAddr.Ok
     });
 
-    const badgeClaim = JSON.parse(result.Ok.App[1]);
-    t.deepEqual(badgeClaim, {
+    const badge = JSON.parse(result.Ok.App[1]);
+    t.deepEqual(badge, {
       recipient: bobAddress,
       badge_class: addr.Ok,
-      issuer: aliceAddress,
+      issuers: [aliceAddress],
       evidences: []
     });
 
     result = await alice.call(
       "badges_instance",
       "badges",
-      "get_badge_class_claims",
+      "get_badges_for_class",
       {
         badge_class: addr.Ok
       }
     );
 
-    let badgeClaims = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
-    t.deepEqual(badgeClaims, [
+    let badges = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
+    t.deepEqual(badges, [
       {
         recipient: bobAddress,
         badge_class: addr.Ok,
-        issuer: aliceAddress,
+        issuers: [aliceAddress],
         evidences: []
       }
     ]);
 
-    const assertionAddr = await bob.call(
+    const badgeAddr = await bob.call(
       "badges_instance",
       "badges",
-      "create_own_badge_assertion",
+      "receive_own_badge",
       {
         badge_class: addr.Ok
       }
@@ -145,43 +149,22 @@ orchestrator.registerScenario(
 
     await s.consistency();
 
-    console.log("iaaa", assertionAddr);
-
     result = await bob.call("badges_instance", "badges", "get_entry", {
-      address: assertionAddr.Ok
+      address: badgeAddr.Ok
     });
 
-    const badgeAssertion = JSON.parse(result.Ok.App[1]);
-    t.deepEqual(badgeAssertion, {
+    badge = JSON.parse(result.Ok.App[1]);
+    t.deepEqual(badge, {
       recipient: bobAddress,
-      badge_class: addr.Ok
+      badge_class: addr.Ok,
+      issuers: [aliceAddress],
+      evidences: []
     });
 
     result = await alice.call(
       "badges_instance",
       "badges",
-      "get_badge_class_assertions",
-      {
-        badge_class: addr.Ok
-      }
-    );
-
-    let badgeAssertions = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
-    t.deepEqual(badgeAssertions, [
-      {
-        recipient: aliceAddress,
-        badge_class: addr.Ok
-      },
-      {
-        recipient: bobAddress,
-        badge_class: addr.Ok
-      }
-    ]);
-
-    result = await alice.call(
-      "badges_instance",
-      "badges",
-      "get_badge_assertions_to_recipient",
+      "get_badges_to_recipient",
       {
         agent_address: bobAddress
       }
@@ -191,14 +174,16 @@ orchestrator.registerScenario(
     t.deepEqual(badgeAssertions, [
       {
         recipient: bobAddress,
-        badge_class: addr.Ok
+        badge_class: addr.Ok,
+        issuers: [aliceAddress],
+        evidences: []
       }
     ]);
 
     result = await alice.call(
       "badges_instance",
       "badges",
-      "get_badge_claims_from_issuer",
+      "get_badges_from_issuer",
       {
         agent_address: aliceAddress
       }
@@ -209,32 +194,13 @@ orchestrator.registerScenario(
       {
         recipient: bobAddress,
         badge_class: addr.Ok,
-        issuer: aliceAddress,
-        evidences: []
-      }
-    ]);
-
-    result = await alice.call(
-      "badges_instance",
-      "badges",
-      "get_badge_claims_to_recipient",
-      {
-        agent_address: bobAddress
-      }
-    );
-
-    badgeClaims = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
-    t.deepEqual(badgeClaims, [
-      {
-        recipient: bobAddress,
-        badge_class: addr.Ok,
-        issuer: aliceAddress,
+        issuers: [aliceAddress],
         evidences: []
       }
     ]);
   }
 );
- 
+/* 
 orchestrator.registerScenario(
   "validation via social triangulation",
   async (s, t) => {
@@ -243,7 +209,8 @@ orchestrator.registerScenario(
         alice: mainConfig,
         bob: mainConfig,
         carol: mainConfig,
-        dave: mainConfig
+        dave: mainConfig,
+        eve: mainConfig
       },
       true
     );
@@ -252,7 +219,9 @@ orchestrator.registerScenario(
     const bobAddress = bob.instance("badges_instance").agentAddress;
     const carolAddress = carol.instance("badges_instance").agentAddress;
     const daveAddress = dave.instance("badges_instance").agentAddress;
+    const eveAddress = eve.instance("badges_instance").agentAddress;
 
+    // Alice creates a badge
     const addr = await alice.call(
       "badges_instance",
       "badges",
@@ -267,10 +236,11 @@ orchestrator.registerScenario(
 
     await s.consistency();
 
+    // Dave cannot claim that bob deserves that badge
     let error = await dave.call(
       "badges_instance",
       "badges",
-      "create_badge_claim",
+      "claim_user_deserves_badge",
       {
         recipient: bobAddress,
         badge_class: addr.Ok,
@@ -281,22 +251,20 @@ orchestrator.registerScenario(
 
     await s.consistency();
 
-    error = await bob.call(
-      "badges_instance",
-      "badges",
-      "create_own_badge_assertion",
-      {
-        badge_class: addr.Ok
-      }
-    );
+    // Bob cannot receive that badge
+    error = await bob.call("badges_instance", "badges", "receive_own_badge", {
+      badge_class: addr.Ok
+    });
 
     t.notOk(error.Ok);
+
     await s.consistency();
 
+    // Alice claims that Bob should get the badge
     let result = await alice.call(
       "badges_instance",
       "badges",
-      "create_badge_claim",
+      "claim_user_deserves_badge",
       {
         recipient: bobAddress,
         badge_class: addr.Ok,
@@ -307,22 +275,18 @@ orchestrator.registerScenario(
 
     await s.consistency();
 
-    result = await bob.call(
-      "badges_instance",
-      "badges",
-      "create_own_badge_assertion",
-      {
-        badge_class: addr.Ok
-      }
-    );
+    result = await bob.call("badges_instance", "badges", "receive_own_badge", {
+      badge_class: addr.Ok
+    });
     t.ok(result.Ok);
 
     await s.consistency();
 
+    // Alice claims that Carol should get the badge
     result = await alice.call(
       "badges_instance",
       "badges",
-      "create_badge_claim",
+      "claim_user_deserves_badge",
       {
         recipient: carolAddress,
         badge_class: addr.Ok,
@@ -337,7 +301,7 @@ orchestrator.registerScenario(
     result = await carol.call(
       "badges_instance",
       "badges",
-      "create_own_badge_assertion",
+      "receive_own_badge",
       {
         badge_class: addr.Ok
       }
@@ -346,19 +310,11 @@ orchestrator.registerScenario(
 
     await s.consistency();
 
-    result = await bob.call("badges_instance", "badges", "create_badge_claim", {
-      recipient: daveAddress,
-      badge_class: addr.Ok,
-      evidences: []
-    });
-    t.ok(result.Ok);
-
-    await s.consistency();
-
-    result = await carol.call(
+    // Bob now claims that dave should get the badge
+    result = await bob.call(
       "badges_instance",
       "badges",
-      "create_badge_claim",
+      "claim_user_deserves_badge",
       {
         recipient: daveAddress,
         badge_class: addr.Ok,
@@ -369,39 +325,65 @@ orchestrator.registerScenario(
 
     await s.consistency();
 
+    // Carol now claims that dave should get the badge
+    result = await carol.call(
+      "badges_instance",
+      "badges",
+      "claim_user_deserves_badge",
+      {
+        recipient: daveAddress,
+        badge_class: addr.Ok,
+        evidences: []
+      }
+    );
+    t.ok(result.Ok);
+
+    await s.consistency();
+
+    result = await dave.call("badges_instance", "badges", "receive_own_badge", {
+      badge_class: addr.Ok
+    });
+    await s.consistency();
+
+    t.ok(result.Ok);
+
+    // Carol now claims that eve should get the badge
+    result = await carol.call(
+      "badges_instance",
+      "badges",
+      "claim_user_deserves_badge",
+      {
+        recipient: eveAddress,
+        badge_class: addr.Ok,
+        evidences: []
+      }
+    );
+    t.ok(result.Ok);
+
+    await s.consistency();
+
+    // Dave now claims that eve should get the badge
     result = await dave.call(
       "badges_instance",
       "badges",
-      "get_badge_claims_to_recipient",
+      "claim_user_deserves_badge",
       {
-        agent_address: daveAddress
+        recipient: eveAddress,
+        badge_class: addr.Ok,
+        evidences: []
       }
     );
-    const badgeClaims = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
-    t.equal(badgeClaims.length, 2);
+    t.ok(result.Ok);
 
     await s.consistency();
 
-    const triangulationResult = await dave.call(
-      "badges_instance",
-      "badges",
-      "create_own_badge_assertion",
-      {
-        badge_class: addr.Ok
-      }
-    );
-    await s.consistency();
-
-    result = await dave.call("badges_instance", "badges", "get_entry", {
-      address: triangulationResult.Ok
-    });
-
-    const badgeAssertion = JSON.parse(result.Ok.App[1]);
-    t.deepEqual(badgeAssertion, {
-      recipient: daveAddress,
+    result = await eve.call("badges_instance", "badges", "receive_own_badge", {
       badge_class: addr.Ok
     });
+    await s.consistency();
+
+    t.ok(result.Ok);
   }
-); 
+); */
 
 orchestrator.run();
