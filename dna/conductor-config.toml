@@ -12,7 +12,7 @@ test_agent = true
 
 [[dnas]]
 file = '/home/guillem/projects/holochain/hc-badges/dna/dist/dna.dna.json'
-hash = 'QmVZmSNMrCnYoRZot9EnKbYjVPHeyVaoRgdgt26CBFVX79'
+hash = 'QmbSn26rEkt59uaU2Xvung1wSPs5XEtgNwszvVviN5cppj'
 id = 'hc-run-dna'
 
 [[instances]]
@@ -32,7 +32,7 @@ id = 'test-instance'
 
 [interfaces.driver]
 port = 8889
-type = 'http'
+type = 'websocket'
 
 [logger]
 state_dump = true

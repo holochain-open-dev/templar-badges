@@ -18,8 +18,8 @@ const dnaPath = path.join(__dirname, "../dist/dna.dna.json");
 
 const orchestrator = new Orchestrator({
   waiter: {
-    softTimeout: 40000,
-    hardTimeout: 80000
+    softTimeout: 80000,
+    hardTimeout: 160000
   }
 });
 
@@ -138,14 +138,14 @@ orchestrator.registerScenario(
         evidences: []
       }
     ]);
-
+    
     await s.consistency();
-
+    
     // This works!
     result = await alice.call("badges_instance", "badges", "get_entry", {
       address: claimAddr.Ok
     });
-
+    
     badge = JSON.parse(result.Ok.App[1]);
     t.deepEqual(badge, {
       recipient: bobAddress,
@@ -153,6 +153,8 @@ orchestrator.registerScenario(
       issuers: [aliceAddress],
       evidences: []
     });
+
+    await s.consistency();
 
     /*           const badgeAddr = await bob.call(
             "badges_instance",

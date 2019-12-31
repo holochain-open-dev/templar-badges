@@ -57,7 +57,9 @@ pub fn entry_def() -> ValidatingEntryType {
 
                     let author = get_chain_agent_id(&entries)?;
 
+                    // TODO validate evidences
                     if author == new_entry.recipient {
+                        // TODO validate that issuers haven't changed
                         if new_entry.issuers.len() != old_entry.issuers.len() {
                             return Err(String::from("Recipient of a badge can't add an issuer"));
                         }
