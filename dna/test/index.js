@@ -18,8 +18,8 @@ const dnaPath = path.join(__dirname, "../dist/dna.dna.json");
 
 const orchestrator = new Orchestrator({
   waiter: {
-    softTimeout: 80000,
-    hardTimeout: 160000
+    softTimeout: 10000,
+    hardTimeout: 20000
   }
 });
 
@@ -138,14 +138,13 @@ orchestrator.registerScenario(
         evidences: []
       }
     ]);
-    
+
     await s.consistency();
-    
-    // This works!
+
     result = await alice.call("badges_instance", "badges", "get_entry", {
       address: claimAddr.Ok
     });
-    
+
     badge = JSON.parse(result.Ok.App[1]);
     t.deepEqual(badge, {
       recipient: bobAddress,
@@ -156,19 +155,17 @@ orchestrator.registerScenario(
 
     await s.consistency();
 
-    /*           const badgeAddr = await bob.call(
-            "badges_instance",
-            "badges",
-            "receive_own_badge",
-            {
-              badge_class: addr.Ok
-            }
-            );
-            
-            await s.consistency();
- */
+    const badgeAddr = await bob.call(
+      "badges_instance",
+      "badges",
+      "receive_own_badge",
+      {
+        badge_class: addr.Ok
+      }
+    );
 
-    // This fails!
+    await s.consistency();
+
     result = await bob.call("badges_instance", "badges", "get_entry", {
       address: claimAddr.Ok
     });
@@ -181,7 +178,6 @@ orchestrator.registerScenario(
       evidences: []
     });
 
-    /* 
     result = await alice.call(
       "badges_instance",
       "badges",
@@ -218,14 +214,14 @@ orchestrator.registerScenario(
         issuers: [aliceAddress],
         evidences: []
       }
-    ]); */
+    ]);
   }
 );
-/* 
+
 orchestrator.registerScenario(
   "validation via social triangulation",
   async (s, t) => {
-    const { alice, bob, carol, dave } = await s.players(
+    const { alice, bob, carol, dave, eve } = await s.players(
       {
         alice: mainConfig,
         bob: mainConfig,
@@ -405,6 +401,6 @@ orchestrator.registerScenario(
 
     t.ok(result.Ok);
   }
-); */
+);
 
 orchestrator.run();

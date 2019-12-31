@@ -199,7 +199,7 @@ fn assert_issuer_valid(
     }
 
     Err(ZomeApiError::from(format!(
-        "Agent {} is not a valid issue for badge {}",
+        "Agent {} is not a valid issuer for badge {}",
         issuer, badge_class.name
     )))
 }
