@@ -36,7 +36,7 @@ pub fn entry_def() -> ValidatingEntryType {
                 EntryValidationData::Modify {
                     new_entry,
                     old_entry,
-                    validation_data, 
+                    validation_data,
                     ..
                 } => {
                     if new_entry.issuers.contains(&new_entry.recipient) {
@@ -59,13 +59,8 @@ pub fn entry_def() -> ValidatingEntryType {
 
                     // TODO validate evidences
                     if author == new_entry.recipient {
-                        // TODO validate that issuers haven't changed
-                        if new_entry.issuers.len() != old_entry.issuers.len() {
-                            return Err(String::from("Recipient of a badge can't add an issuer"));
-                        }
-
+                        assert_issuers_are_equal(&old_entry.issuers, &new_entry.issuers)?;
                     } else if get_new_issuer(&new_entry.issuers, &old_entry.issuers)? == author {
-
                         assert_issuer_valid(new_entry.badge_class, badge_class, author, &entries)?;
                     } else {
                         return Err(String::from("Only issuers or the recipient can change "));
@@ -140,7 +135,9 @@ pub fn update_badge_with_me_as_issuer(
     let last_entry: Option<Entry> = hdk::get_entry(&badge_address)?;
 
     if let Some(last_badge_entry) = last_entry {
-        badge = Badge::try_from(last_badge_entry.content())?;
+        hdk::debug(format!("haaaaa {:?}", last_badge_entry.content()))?;
+
+        badge = hdk::utils::get_as_type(badge_address.clone())?;
     } else {
         hdk::commit_entry(&initial_entry)?;
     }
@@ -164,11 +161,24 @@ pub fn update_badge_with_me_as_issuer(
         String::from(badge_class.clone()).as_str(),
     )?;
     hdk::link_entries(&badge_class, &address, "badge_class->badge", "")?;
-    
     Ok(badge_address)
 }
 
 /** Validation helpers */
+
+fn assert_issuers_are_equal(old_issuers: &Vec<Address>, new_issuers: &Vec<Address>) -> ZomeApiResult<()> {
+    if old_issuers.len() != new_issuers.len() {
+        return Err(ZomeApiError::from(format!("Recipient of a badge can't change issuers")))
+    }
+    
+    for i in 0..old_issuers.len() {
+        if old_issuers.get(i) != new_issuers.get(i) {
+            return Err(ZomeApiError::from(format!("Recipient of a badge can't change issuers")))
+        }
+    }
+
+    Ok(())
+}
 
 /**
  * Badge claims are valid if there are more actual claims than validators,
@@ -197,6 +207,11 @@ fn assert_issuer_valid(
             }
         }
     }
+
+    hdk::debug(format!(
+        "hiiii {}, {:?}, {}, {:?}",
+        badge_class_address, badge_class, issuer, chain_entries
+    ))?;
 
     Err(ZomeApiError::from(format!(
         "Agent {} is not a valid issuer for badge {}",

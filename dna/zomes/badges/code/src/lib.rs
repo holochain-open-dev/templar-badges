@@ -151,10 +151,11 @@ mod my_zome {
 
         match hdk::get_entry(&badge_address)? {
             None => Err(ZomeApiError::from(format!(
-                "Badge class {} not found",
-                badge_class
+                "Badge {} not found",
+                badge_address
             ))),
             Some(entry) => {
+                hdk::debug(format!("hooo, {:?}", entry))?;
                 hdk::update_entry(entry, &badge_address)?;
                 Ok(badge_address)
             }
