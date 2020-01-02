@@ -26,8 +26,8 @@ const dnaPath = path.join(__dirname, "../dist/dna.dna.json");
 
 const orchestrator = new Orchestrator({
   waiter: {
-    softTimeout: 20000,
-    hardTimeout: 30000
+    softTimeout: 30000,
+    hardTimeout: 40000
   }
 });
 
@@ -136,7 +136,7 @@ orchestrator.registerScenario(
     await s.consistency();
 
     const badgeAddr = await receiveOwnBadge(addr.Ok)(bob);
-
+    t.ok(badgeAddr.Ok);
     await s.consistency();
 
     result = await getEntry(claimAddr.Ok)(bob);
