@@ -6,52 +6,43 @@ import { ApolloClientModule } from '@uprtcl/common';
 import { moduleConnect } from '@uprtcl/micro-orchestrator';
 
 import '@material/mwc-top-app-bar';
+import { GET_AGENT_BADGES } from 'src/graphql/queries';
+import { Badge } from '../types';
 
 export class BadgesForAgent extends moduleConnect(LitElement) {
   @property({ type: String })
   agentId!: string;
 
+  @property({ type: Object })
+  badges!: Array<Badge>;
+
   async firstUpdated() {
-    const client: ApolloClient<any> = this.request(ApolloClientModule.types.Client);
+    const client: ApolloClient<any> = this.request(
+      ApolloClientModule.types.Client
+    );
     const result = await client.query({
-      query: gql`{
-        getEntity(id: "${this.pageHash}") {
-          id
-          content {
-            id
-            entity {
-              ... on TextNode {
-                text
-                links
-              }
-            }
-          }
-        }
-      }`
+      query: GET_AGENT_BADGES,
+      variables: {
+        agentId: this.agentId
+      }
     });
 
-    this.textNode = result.data.getEntity.content.entity;
+    this.badges = result.data.agent.receivedBadges;
   }
 
   render() {
-    if (!this.textNode)
+    if (!this.badges)
       return html`
-        <cortex-loading-placeholder></cortex-loading-placeholder>
+        <span>Loading...</span>
       `;
 
     return html`
-      <mwc-top-app-bar>
-        <div slot="title">${this.textNode.text}</div>
-
-        <div slot="actionItems">
-          <cortex-actions .hash=${this.pageHash} ></cortex-actions>
-        </div>
-      </mwc-top-app-bar>
-
       <div class="column">
-        ${this.textNode.links.map(
-          link => html`
-            <cortex-entity .hash=${link} lens-type="content"> </cortex-entity>
+        ${this.badges.map(
+          badge => html`
+            <div>
+              ${badge.class.name}
+            </div>
           `
         )}
       </div>

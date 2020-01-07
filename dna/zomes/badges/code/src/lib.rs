@@ -54,48 +54,75 @@ mod my_zome {
     }
 
     #[zome_fn("hc_public")]
-    fn get_all_badge_classes() -> ZomeApiResult<Vec<ZomeApiResult<Entry>>> {
-        hdk::get_links_and_load(
+    fn get_my_address() -> ZomeApiResult<Address> {
+        Ok(AGENT_ADDRESS.clone())
+    }
+
+    #[zome_fn("hc_public")]
+    fn get_badge(recipient: Address, badge_class: Address) -> ZomeApiResult<Option<Entry>> {
+        let badge = badge::initial_badge(&recipient, &badge_class);
+        let address = badge::badge_address(badge)?;
+        hdk::get_entry(&address)
+    }
+
+    #[zome_fn("hc_public")]
+    fn get_entry_history(address: Address) -> ZomeApiResult<Option<EntryHistory>> {
+        hdk::get_entry_history(&address)
+    }
+
+    #[zome_fn("hc_public")]
+    fn get_all_badge_classes() -> ZomeApiResult<Vec<Address>> {
+        let links = hdk::get_links(
             &anchor_address()?,
             LinkMatch::Exactly("anchor->badge_class"),
             LinkMatch::Any,
-        )
+        )?;
+
+        Ok(links.addresses())
     }
 
     #[zome_fn("hc_public")]
-    fn get_badges_for_class(badge_class: Address) -> ZomeApiResult<Vec<ZomeApiResult<Entry>>> {
-        hdk::get_links_and_load(
+    fn get_badges_for_class(badge_class: Address) -> ZomeApiResult<Vec<Address>> {
+        let links = hdk::get_links(
             &badge_class,
             LinkMatch::Exactly("badge_class->badge"),
             LinkMatch::Any,
-        )
+        )?;
+
+        Ok(links.addresses())
     }
 
     #[zome_fn("hc_public")]
-    fn get_badges_to_recipient(agent_address: Address) -> ZomeApiResult<Vec<ZomeApiResult<Entry>>> {
-        hdk::get_links_and_load(
+    fn get_badges_to_recipient(agent_address: Address) -> ZomeApiResult<Vec<Address>> {
+        let links = hdk::get_links(
             &agent_address,
             LinkMatch::Exactly("recipient->badge"),
             LinkMatch::Any,
-        )
+        )?;
+
+        Ok(links.addresses())
     }
 
     #[zome_fn("hc_public")]
-    fn get_badges_from_issuer(agent_address: Address) -> ZomeApiResult<Vec<ZomeApiResult<Entry>>> {
-        hdk::get_links_and_load(
+    fn get_badges_from_issuer(agent_address: Address) -> ZomeApiResult<Vec<Address>> {
+        let links = hdk::get_links(
             &agent_address,
             LinkMatch::Exactly("issuer->badge"),
             LinkMatch::Any,
-        )
+        )?;
+
+        Ok(links.addresses())
     }
 
     #[zome_fn("hc_public")]
-    fn get_created_badges(agent_address: Address) -> ZomeApiResult<Vec<ZomeApiResult<Entry>>> {
-        hdk::get_links_and_load(
+    fn get_created_badges(agent_address: Address) -> ZomeApiResult<Vec<Address>> {
+        let links = hdk::get_links(
             &agent_address,
             LinkMatch::Exactly("creator->badge_class"),
             LinkMatch::Any,
-        )
+        )?;
+
+        Ok(links.addresses())
     }
 
     #[zome_fn("hc_public")]
@@ -134,7 +161,7 @@ mod my_zome {
     }
 
     #[zome_fn("hc_public")]
-    fn claim_user_deserves_badge(
+    fn claim_agent_deserves_badge(
         recipient: Address,
         badge_class: Address,
         evidences: Vec<Address>,

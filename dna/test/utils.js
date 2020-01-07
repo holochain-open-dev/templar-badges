@@ -10,9 +10,9 @@ function createBadgeClass(badgeClass = testBadgeClass) {
     caller.call("badges_instance", "badges", "create_badge_class", badgeClass);
 }
 
-function claimUserDeservesBadge(recipient, badgeClass) {
+function claimAgentDeservesBadge(recipient, badgeClass) {
   return caller =>
-    caller.call("badges_instance", "badges", "claim_user_deserves_badge", {
+    caller.call("badges_instance", "badges", "claim_agent_deserves_badge", {
       recipient: recipient,
       badge_class: badgeClass,
       evidences: []
@@ -40,11 +40,19 @@ function getEntry(address) {
     });
 }
 
+function getEntryHistory(address) {
+  return caller =>
+    caller.call("badges_instance", "badges", "get_entry_history", {
+      address
+    });
+}
+
 module.exports = {
   createBadgeClass,
-  claimUserDeservesBadge,
+  claimAgentDeservesBadge,
   getEntry,
   receiveOwnBadge,
+  getEntryHistory,
   isOwnBadgeValid,
   testBadgeClass
 };

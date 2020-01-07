@@ -11,9 +11,10 @@ const {
 
 const {
   createBadgeClass,
-  claimUserDeservesBadge,
+  claimAgentDeservesBadge,
   getEntry,
   testBadgeClass,
+  getEntryHistory,
   isOwnBadgeValid,
   receiveOwnBadge
 } = require("./utils");
@@ -93,7 +94,7 @@ orchestrator.registerScenario(
     t.notOk(valid.Ok);
     await s.consistency();
 
-    let { Ok: badgeAddr } = await claimUserDeservesBadge(
+    let { Ok: badgeAddr } = await claimAgentDeservesBadge(
       bobAddress,
       badgeClassAddr
     )(alice);
@@ -142,6 +143,9 @@ orchestrator.registerScenario(
     });
 
     await s.consistency();
+
+    result = await getEntryHistory(badgeAddr)(alice);
+    t.equal(result.Ok.items[0].entry, {});
 
     result = await getEntry(badgeAddr)(bob);
     badge = JSON.parse(result.Ok.App[1]);
@@ -226,12 +230,12 @@ orchestrator.registerScenario(
     await s.consistency();
 
     // Dave cannot claim that Bob deserves that badge
-    let error = await claimUserDeservesBadge(bobAddress, badgeClassAddress)(dave);
+    let error = await claimAgentDeservesBadge(bobAddress, badgeClassAddress)(dave);
     t.notOk(error.Ok);
     await s.consistency();
 
     // Alice claims that Bob should get the badge
-    let result = await claimUserDeservesBadge(bobAddress, badgeClassAddress)(alice);
+    let result = await claimAgentDeservesBadge(bobAddress, badgeClassAddress)(alice);
     t.ok(result.Ok);
     await s.consistency();
 
@@ -248,7 +252,7 @@ orchestrator.registerScenario(
     await s.consistency();
 
     // Alice claims that Carol should get the badge
-    result = await claimUserDeservesBadge(carolAddress, badgeClassAddress)(alice);
+    result = await claimAgentDeservesBadge(carolAddress, badgeClassAddress)(alice);
     t.ok(result.Ok);
     await s.consistency();
 
@@ -261,12 +265,12 @@ orchestrator.registerScenario(
     await s.consistency();
 
     // Bob now claims that Dave should get the badge
-    result = await claimUserDeservesBadge(daveAddress, badgeClassAddress)(bob);
+    result = await claimAgentDeservesBadge(daveAddress, badgeClassAddress)(bob);
     t.ok(result.Ok);
     await s.consistency();
 
     // Carol now claims that Dave should get the badge
-    result = await claimUserDeservesBadge(daveAddress, badgeClassAddress)(carol);
+    result = await claimAgentDeservesBadge(daveAddress, badgeClassAddress)(carol);
     t.ok(result.Ok);
     await s.consistency();
 
@@ -279,12 +283,12 @@ orchestrator.registerScenario(
     await s.consistency();
 
     // Carol now claims that Eve should get the badge
-    result = await claimUserDeservesBadge(eveAddress, badgeClassAddress)(carol);
+    result = await claimAgentDeservesBadge(eveAddress, badgeClassAddress)(carol);
     t.ok(result.Ok);
     await s.consistency();
 
     // Dave now claims that Eve should get the badge
-    result = await claimUserDeservesBadge(eveAddress, badgeClassAddress)(dave);
+    result = await claimAgentDeservesBadge(eveAddress, badgeClassAddress)(dave);
     t.ok(result.Ok);
     await s.consistency();
 
