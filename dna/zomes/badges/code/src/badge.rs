@@ -115,10 +115,22 @@ pub fn initial_badge(recipient: &Address, badge_class: &Address) -> Badge {
     }
 }
 
-pub fn badge_address(badge: Badge) -> ZomeApiResult<Address> {
-    let initial_entry = Entry::App("badge".into(), badge.into());
+/**
+ * Returns the initial badge address for the given recipient and class
+ */
+pub fn my_badge(badge_class: &Address) -> Badge {
+    Badge {
+        recipient: AGENT_ADDRESS.clone(),
+        badge_class: badge_class.clone(),
+        issuers: vec![],
+        evidences: vec![],
+    }
+}
 
-    hdk::entry_address(&initial_entry)
+pub fn badge_address(badge: Badge) -> ZomeApiResult<Address> {
+    let entry = Entry::App("badge".into(), badge.into());
+
+    hdk::entry_address(&entry)
 }
 
 pub fn update_badge_with_me_as_issuer(

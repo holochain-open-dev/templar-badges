@@ -17,6 +17,7 @@ pub mod badge;
 pub mod badge_class;
 pub mod utils;
 
+use badge::Badge;
 use badge_class::BadgeClass;
 
 #[zome]
@@ -144,6 +145,15 @@ mod my_zome {
 
     #[zome_fn("hc_public")]
     fn receive_own_badge(badge_class: Address) -> ZomeApiResult<Address> {
+        let valid = internal_is_own_badge_valid(badge_class.clone())?;
+
+        if !valid {
+            return Err(ZomeApiError::from(format!(
+                "Badge {} is not valid yet to receive",
+                badge_class
+            )));
+        }
+
         badge_class::commit_badge_class(&badge_class)?;
 
         let badge = badge::initial_badge(&AGENT_ADDRESS.clone(), &badge_class);
@@ -155,11 +165,16 @@ mod my_zome {
                 badge_address
             ))),
             Some(entry) => {
-                hdk::debug(format!("hooo, {:?}", entry))?;
+                hdk::debug(format!("hooo1, {:?}", entry))?;
                 hdk::update_entry(entry, &badge_address)?;
                 Ok(badge_address)
             }
         }
+    }
+
+    #[zome_fn("hc_public")]
+    fn is_own_badge_valid(badge_class: Address) -> ZomeApiResult<bool> {
+        internal_is_own_badge_valid(badge_class)
     }
 }
 
@@ -173,4 +188,14 @@ pub fn anchor_address() -> ZomeApiResult<Address> {
     }
 
     Ok(anchor_address)
+}
+
+pub fn internal_is_own_badge_valid(badge_class: Address) -> ZomeApiResult<bool> {
+    let class: BadgeClass = hdk::utils::get_as_type(badge_class.clone())?;
+    let badge = badge::my_badge(&badge_class);
+    let badge_address = badge::badge_address(badge)?;
+    let new_badge: Badge = hdk::utils::get_as_type(badge_address)?;
+    hdk::debug(format!("hooo2, {:?}", new_badge.clone()))?;
+
+    Ok(new_badge.issuers.len() >= class.validators)
 }

@@ -26,6 +26,13 @@ function receiveOwnBadge(badgeClass) {
     });
 }
 
+function isOwnBadgeValid(badgeClass) {
+  return caller =>
+    caller.call("badges_instance", "badges", "is_own_badge_valid", {
+      badge_class: badgeClass
+    });
+}
+
 function getEntry(address) {
   return caller =>
     caller.call("badges_instance", "badges", "get_entry", {
@@ -38,5 +45,6 @@ module.exports = {
   claimUserDeservesBadge,
   getEntry,
   receiveOwnBadge,
+  isOwnBadgeValid,
   testBadgeClass
 };
