@@ -14,9 +14,8 @@ const {
   claimAgentDeservesBadge,
   getEntry,
   testBadgeClass,
-  getEntryHistory,
-  isOwnBadgeValid,
-  receiveOwnBadge
+  getEntries,
+  getEntryHistory
 } = require("./utils");
 
 process.on("unhandledRejection", error => {
@@ -46,7 +45,7 @@ const mainConfig = Config.gen(
 );
 
 orchestrator.registerScenario(
-  "create badge class, make a badge claim for another agent, have that agent create the badge assertion",
+  "create badge class, make a badge claim for another agent",
   async (s, t) => {
     const { alice, bob } = await s.players(
       {
@@ -79,7 +78,7 @@ orchestrator.registerScenario(
       {}
     );
 
-    const allBadges = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
+    const allBadges = await getEntries(result.Ok)(alice);
     t.deepEqual(allBadges, [
       {
         name: "Test badge",
@@ -89,10 +88,6 @@ orchestrator.registerScenario(
         validators: 2
       }
     ]);
-
-    let valid = await isOwnBadgeValid(badgeClassAddr)(bob);
-    t.notOk(valid.Ok);
-    await s.consistency();
 
     let { Ok: badgeAddr } = await claimAgentDeservesBadge(
       bobAddress,
@@ -120,7 +115,7 @@ orchestrator.registerScenario(
       }
     );
 
-    let badges = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
+    let badgesPromises = await getEntries(result.Ok)(alice);
     t.deepEqual(badges, [
       {
         recipient: bobAddress,
@@ -132,9 +127,8 @@ orchestrator.registerScenario(
 
     await s.consistency();
 
-    result = await getEntry(badgeAddr)(alice);
+    badge = await getEntry(badgeAddr)(alice);
 
-    badge = JSON.parse(result.Ok.App[1]);
     t.deepEqual(badge, {
       recipient: bobAddress,
       badge_class: badgeClassAddr,
@@ -147,22 +141,13 @@ orchestrator.registerScenario(
     result = await getEntryHistory(badgeAddr)(alice);
     t.equal(result.Ok.items[0].entry, {});
 
-    result = await getEntry(badgeAddr)(bob);
-    badge = JSON.parse(result.Ok.App[1]);
+    badge = await getEntry(badgeAddr)(bob);
     t.deepEqual(badge, {
       recipient: bobAddress,
       badge_class: badgeClassAddr,
       issuers: [aliceAddress],
       evidences: []
     });
-    await s.consistency();
-
-    valid = await isOwnBadgeValid(badgeClassAddr)(bob);
-    t.ok(valid.Ok);
-    await s.consistency();
-
-    badgeAddr = await receiveOwnBadge(badgeClassAddr)(bob);
-    t.ok(badgeAddr.Ok);
     await s.consistency();
 
     result = await alice.call(
@@ -174,8 +159,8 @@ orchestrator.registerScenario(
       }
     );
 
-    badgeAssertions = result.Ok.map(b => JSON.parse(b.Ok.App[1]));
-    t.deepEqual(badgeAssertions, [
+    const badges = await getEntry(result.Ok)(alice);
+    t.deepEqual(badges, [
       {
         recipient: bobAddress,
         badge_class: badgeClassAddr,
@@ -204,7 +189,7 @@ orchestrator.registerScenario(
     ]);
   }
 );
-/* 
+
 orchestrator.registerScenario(
   "validation via social triangulation",
   async (s, t) => {
@@ -226,16 +211,22 @@ orchestrator.registerScenario(
     const eveAddress = eve.instance("badges_instance").agentAddress;
 
     // Alice creates a badge
-    const {Ok: badgeClassAddress} = await createBadgeClass()(alice);
+    const { Ok: badgeClassAddress } = await createBadgeClass()(alice);
     await s.consistency();
 
     // Dave cannot claim that Bob deserves that badge
-    let error = await claimAgentDeservesBadge(bobAddress, badgeClassAddress)(dave);
+    let error = await claimAgentDeservesBadge(
+      bobAddress,
+      badgeClassAddress
+    )(dave);
     t.notOk(error.Ok);
     await s.consistency();
 
     // Alice claims that Bob should get the badge
-    let result = await claimAgentDeservesBadge(bobAddress, badgeClassAddress)(alice);
+    let result = await claimAgentDeservesBadge(
+      bobAddress,
+      badgeClassAddress
+    )(alice);
     t.ok(result.Ok);
     await s.consistency();
 
@@ -243,24 +234,11 @@ orchestrator.registerScenario(
     const badge = JSON.parse(result.Ok.App[1]);
     t.equal(badge.issuers.length, 1);
 
-    let valid = await isOwnBadgeValid(badgeClassAddress)(bob);
-    t.ok(valid.Ok);
-    await s.consistency();
-
-    result = await receiveOwnBadge(badgeClassAddress)(bob);
-    t.ok(result.Ok);
-    await s.consistency();
-
     // Alice claims that Carol should get the badge
-    result = await claimAgentDeservesBadge(carolAddress, badgeClassAddress)(alice);
-    t.ok(result.Ok);
-    await s.consistency();
-
-    valid = await isOwnBadgeValid(badgeClassAddress)(carol);
-    t.ok(valid.Ok);
-    await s.consistency();
-
-    result = await receiveOwnBadge(badgeClassAddress)(carol);
+    result = await claimAgentDeservesBadge(
+      carolAddress,
+      badgeClassAddress
+    )(alice);
     t.ok(result.Ok);
     await s.consistency();
 
@@ -270,20 +248,18 @@ orchestrator.registerScenario(
     await s.consistency();
 
     // Carol now claims that Dave should get the badge
-    result = await claimAgentDeservesBadge(daveAddress, badgeClassAddress)(carol);
-    t.ok(result.Ok);
-    await s.consistency();
-
-    valid = await isOwnBadgeValid(badgeClassAddress)(dave);
-    t.ok(valid.Ok);
-    await s.consistency();
-
-    result = await receiveOwnBadge(badgeClassAddress)(dave);
+    result = await claimAgentDeservesBadge(
+      daveAddress,
+      badgeClassAddress
+    )(carol);
     t.ok(result.Ok);
     await s.consistency();
 
     // Carol now claims that Eve should get the badge
-    result = await claimAgentDeservesBadge(eveAddress, badgeClassAddress)(carol);
+    result = await claimAgentDeservesBadge(
+      eveAddress,
+      badgeClassAddress
+    )(carol);
     t.ok(result.Ok);
     await s.consistency();
 
@@ -291,15 +267,7 @@ orchestrator.registerScenario(
     result = await claimAgentDeservesBadge(eveAddress, badgeClassAddress)(dave);
     t.ok(result.Ok);
     await s.consistency();
-
-    valid = await isOwnBadgeValid(badgeClassAddress)(eve);
-    t.ok(valid.Ok);
-    await s.consistency();
-
-    result = await receiveOwnBadge(badgeClassAddress)(eve);
-    t.ok(result.Ok);
-    await s.consistency();
   }
-); */
+);
 
 orchestrator.run();

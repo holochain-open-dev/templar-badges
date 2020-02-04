@@ -19,20 +19,6 @@ function claimAgentDeservesBadge(recipient, badgeClass) {
     });
 }
 
-function receiveOwnBadge(badgeClass) {
-  return caller =>
-    caller.call("badges_instance", "badges", "receive_own_badge", {
-      badge_class: badgeClass
-    });
-}
-
-function isOwnBadgeValid(badgeClass) {
-  return caller =>
-    caller.call("badges_instance", "badges", "is_own_badge_valid", {
-      badge_class: badgeClass
-    });
-}
-
 function getEntry(address) {
   return caller =>
     caller.call("badges_instance", "badges", "get_entry", {
@@ -41,18 +27,33 @@ function getEntry(address) {
 }
 
 function getEntryHistory(address) {
-  return caller =>
-    caller.call("badges_instance", "badges", "get_entry_history", {
-      address
-    });
+  return caller => {
+    const entry = caller.call(
+      "badges_instance",
+      "badges",
+      "get_entry_history",
+      {
+        address
+      }
+    );
+
+    return JSON.parse(entry.Ok.App[1]);
+  };
+}
+
+function getEntries(addresses) {
+  return caller => {
+    const promises = addresses.map(async address => getEntry(address)(caller));
+
+    return Promise.all(promises);
+  };
 }
 
 module.exports = {
   createBadgeClass,
   claimAgentDeservesBadge,
   getEntry,
-  receiveOwnBadge,
   getEntryHistory,
-  isOwnBadgeValid,
-  testBadgeClass
+  testBadgeClass,
+  getEntries
 };

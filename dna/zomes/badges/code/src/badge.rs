@@ -1,8 +1,6 @@
 use crate::badge_class::BadgeClass;
-use crate::utils::{get_badge_class_from_chain, get_chain_agent_id, get_package_entries};
 use hdk::prelude::*;
 use hdk::AGENT_ADDRESS;
-use std::convert::TryFrom;
 
 #[derive(Serialize, Deserialize, Debug, DefaultJson, Clone)]
 pub struct Badge {
@@ -12,13 +10,33 @@ pub struct Badge {
     pub evidences: Vec<Address>,
 }
 
+impl Badge {
+    /**
+     * Returns the initial badge address for the given recipient and class
+     */
+    pub fn initial(recipient: &Address, badge_class: &Address) -> Badge {
+        Badge {
+            recipient: recipient.clone(),
+            badge_class: badge_class.clone(),
+            issuers: vec![],
+            evidences: vec![],
+        }
+    }
+
+    pub fn address(&self) -> ZomeApiResult<Address> {
+        let entry = Entry::App("badge".into(), self.clone().into());
+
+        hdk::entry_address(&entry)
+    }
+}
+
 pub fn entry_def() -> ValidatingEntryType {
     entry!(
         name: "badge",
         description: "An instance of a badge of a class for a certain person, ",
         sharing: Sharing::Public,
         validation_package: || {
-            hdk::ValidationPackageDefinition::ChainFull
+            hdk::ValidationPackageDefinition::Entry
         },
         validation: |validation_data: hdk::EntryValidationData<Badge>| {
             match validation_data {
@@ -51,20 +69,13 @@ pub fn entry_def() -> ValidatingEntryType {
                         return Err(String::from("Cannot change class of a badge"));
                     }
 
-                    let entries = get_package_entries(&validation_data.package)?;
-
-                    let badge_class = get_badge_class_from_chain(&new_entry.badge_class, &entries)?;
-
-                    let author = get_chain_agent_id(&entries)?;
+                    let author = &validation_data.sources()[0];
 
                     // TODO validate evidences
-                    if author == new_entry.recipient {
-                        assert_issuers_are_equal(&old_entry.issuers, &new_entry.issuers)?;
-                    } else if get_new_issuer(&new_entry.issuers, &old_entry.issuers)? == author {
-                        assert_issuer_valid(new_entry.badge_class, badge_class, author, &entries)?;
-                    } else {
-                        return Err(String::from("Only issuers or the recipient can change "));
+                    if get_new_issuer(&new_entry.issuers, &old_entry.issuers)? != author.clone() {
+                        return Err(String::from("The issuer of a badge can only add themselves to the issuers list"));
                     }
+                    assert_issuer_valid(&new_entry.badge_class, &author)?;
                     Ok(())
                 },
                 _ => Err(String::from("Cannot update or delete a badge class")),
@@ -79,7 +90,14 @@ pub fn entry_def() -> ValidatingEntryType {
                 },
                 validation: | validation_data: hdk::LinkValidationData | {
                     match validation_data {
-                        hdk::LinkValidationData::LinkAdd{ .. } => Ok(()),
+                        hdk::LinkValidationData::LinkAdd { link, .. } => {
+                            let badge: Badge = hdk::utils::get_as_type(link.link.target().clone())?;
+
+                            match badge.recipient == link.link.base().clone() {
+                                true => Ok(()),
+                                false => Err(String::from("Cannot link \"recipient->badge\" from an agent who is not the recipient of the badge"))
+                            }
+                        },
                         _ => Err(String::from("Cannot delete links"))
                     }
                 }
@@ -92,7 +110,15 @@ pub fn entry_def() -> ValidatingEntryType {
                 },
                 validation: | validation_data: hdk::LinkValidationData | {
                     match validation_data {
-                        hdk::LinkValidationData::LinkAdd{ .. } => Ok(()),
+                        hdk::LinkValidationData::LinkAdd { .. } => {
+                            /* let badge: Badge = hdk::utils::get_as_type(link.link.target().clone())?;
+
+                            match badge.issuers.contains(link.link.base()) {
+                                true => Ok(()),
+                                false => Err(format!("Cannot link \"issuer->badge\" from an agent {} who is not the issuer of the badge {:?}", link.link.base(), badge))
+                            } */
+                            Ok(())
+                        },
                         _ => Err(String::from("Cannot delete links"))
                     }
                 }
@@ -101,44 +127,14 @@ pub fn entry_def() -> ValidatingEntryType {
     )
 }
 
-/** Exposed functions */
+/** Handlers */
 
-/**
- * Returns the initial badge address for the given recipient and class
- */
-pub fn initial_badge(recipient: &Address, badge_class: &Address) -> Badge {
-    Badge {
-        recipient: recipient.clone(),
-        badge_class: badge_class.clone(),
-        issuers: vec![],
-        evidences: vec![],
-    }
-}
-
-/**
- * Returns the initial badge address for the given recipient and class
- */
-pub fn my_badge(badge_class: &Address) -> Badge {
-    Badge {
-        recipient: AGENT_ADDRESS.clone(),
-        badge_class: badge_class.clone(),
-        issuers: vec![],
-        evidences: vec![],
-    }
-}
-
-pub fn badge_address(badge: Badge) -> ZomeApiResult<Address> {
-    let entry = Entry::App("badge".into(), badge.into());
-
-    hdk::entry_address(&entry)
-}
-
-pub fn update_badge_with_me_as_issuer(
+pub fn claim_agent_deserves_badge(
     recipient: Address,
     badge_class: Address,
     evidences: Vec<Address>,
 ) -> ZomeApiResult<Address> {
-    let mut badge = initial_badge(&recipient, &badge_class);
+    let mut badge = Badge::initial(&recipient, &badge_class);
 
     let initial_entry = Entry::App("badge".into(), badge.clone().into());
 
@@ -146,9 +142,7 @@ pub fn update_badge_with_me_as_issuer(
 
     let last_entry: Option<Entry> = hdk::get_entry(&badge_address)?;
 
-    if let Some(last_badge_entry) = last_entry {
-        hdk::debug(format!("haaaaa {:?}", last_badge_entry.content()))?;
-
+    if let Some(_) = last_entry {
         badge = hdk::utils::get_as_type(badge_address.clone())?;
     } else {
         hdk::commit_entry(&initial_entry)?;
@@ -157,7 +151,7 @@ pub fn update_badge_with_me_as_issuer(
     badge.issuers.push(AGENT_ADDRESS.clone());
     badge.evidences.append(&mut evidences.clone());
 
-    let new_entry = Entry::App("badge".into(), badge.into());
+    let new_entry = Entry::App("badge".into(), badge.clone().into());
     let address = hdk::update_entry(new_entry, &badge_address)?;
 
     hdk::link_entries(
@@ -166,69 +160,41 @@ pub fn update_badge_with_me_as_issuer(
         "issuer->badge",
         String::from(badge_class.clone()).as_str(),
     )?;
-    hdk::link_entries(
-        &recipient,
-        &badge_address,
-        "recipient->badge",
-        String::from(badge_class.clone()).as_str(),
-    )?;
+
+    let tag = match assert_issuer_valid(&badge.badge_class, &badge.recipient) {
+        Ok(()) => "completed",
+        Err(_) => "temptative",
+    };
+
+    hdk::link_entries(&recipient, &badge_address, "recipient->badge", tag)?;
     hdk::link_entries(&badge_class, &address, "badge_class->badge", "")?;
     Ok(badge_address)
 }
 
 /** Validation helpers */
 
-fn assert_issuers_are_equal(old_issuers: &Vec<Address>, new_issuers: &Vec<Address>) -> ZomeApiResult<()> {
-    if old_issuers.len() != new_issuers.len() {
-        return Err(ZomeApiError::from(format!("Recipient of a badge can't change issuers")))
-    }
-    
-    for i in 0..old_issuers.len() {
-        if old_issuers.get(i) != new_issuers.get(i) {
-            return Err(ZomeApiError::from(format!("Recipient of a badge can't change issuers")))
-        }
-    }
-
-    Ok(())
-}
-
 /**
  * Badge claims are valid if there are more actual claims than validators,
  * or if one of the claims comes from the badge creator itself
  */
-fn assert_issuer_valid(
-    badge_class_address: Address,
-    badge_class: BadgeClass,
-    issuer: Address,
-    chain_entries: &Vec<Entry>,
-) -> ZomeApiResult<()> {
-    if badge_class.creator_address == issuer {
+fn assert_issuer_valid(badge_class_address: &Address, issuer: &Address) -> ZomeApiResult<()> {
+    let badge_class: BadgeClass = hdk::utils::get_as_type(badge_class_address.clone())?;
+
+    if badge_class.creator_address == issuer.clone() {
         return Ok(());
     }
 
-    for entry in chain_entries.iter() {
-        if let Entry::App(entry_type, json) = entry {
-            if entry_type.to_string() == "badge" {
-                let badge = Badge::try_from(json)?;
-                if badge.badge_class == badge_class_address
-                    && badge.recipient == issuer
-                    && badge.issuers.len() >= badge_class.validators
-                {
-                    return Ok(());
-                }
-            }
-        }
+    let badge = Badge::initial(&issuer, &badge_class_address);
+
+    let latest_badge: Badge = hdk::utils::get_as_type(badge.address()?)?;
+
+    match latest_badge.issuers.len() >= badge_class.validators {
+        true => Ok(()),
+        false => Err(ZomeApiError::from(format!(
+            "Issuer {} for badge {} is not valid",
+            issuer, badge_class.name
+        ))),
     }
-
-    hdk::debug(format!(
-        "hiiii {}, {:?}, {}, {:?}",
-        badge_class_address, badge_class, issuer, chain_entries
-    ))?;
-
-    Err(ZomeApiError::from(format!(
-        "Agent {} is not a valid issuer for badge {}",
-        issuer, badge_class.name
-    )))
 }
 
 fn get_new_issuer(

@@ -1,5 +1,7 @@
 use hdk::prelude::*;
 
+use crate::badge::Badge;
+
 #[derive(Serialize, Deserialize, Debug, DefaultJson, Clone)]
 pub struct BadgeClass {
     pub name: String,
@@ -7,40 +9,6 @@ pub struct BadgeClass {
     pub creator_address: Address,
     pub image: String,
     pub validators: usize,
-}
-
-pub fn anchor_entry_def() -> ValidatingEntryType {
-    entry!(
-        name: "anchor",
-        description: "Anchor to all badge classes",
-        sharing: Sharing::Public,
-        validation_package: || {
-            hdk::ValidationPackageDefinition::Entry
-        },
-        validation: |validation_data: hdk::EntryValidationData<String>| {
-            match validation_data {
-                EntryValidationData::Create { .. } => {
-                    Ok(())
-                },
-                _ => Err(String::from("Cannot update or delete an anchor")),
-            }
-        },
-        links: [
-            to!(
-                "badge_class",
-                link_type: "anchor->badge_class",
-                validation_package: || {
-                    hdk::ValidationPackageDefinition::Entry
-                },
-                validation: | validation_data: hdk::LinkValidationData | {
-                    match validation_data {
-                        hdk::LinkValidationData::LinkAdd{ .. } => Ok(()),
-                        _ => Err(String::from("Cannot delete links"))
-                    }
-                }
-            )
-        ]
-    )
 }
 
 pub fn entry_def() -> ValidatingEntryType {
@@ -54,7 +22,7 @@ pub fn entry_def() -> ValidatingEntryType {
         validation: |validation_data: hdk::EntryValidationData<BadgeClass>| {
             match validation_data {
                 EntryValidationData::Create { .. } => {
-/*                     let creator_address = entry.creator_address;
+                /*  let creator_address = entry.creator_address;
 
                     if !validation_data.clone().sources().contains(&creator_address) {
                         return Err(format!(
@@ -64,7 +32,7 @@ pub fn entry_def() -> ValidatingEntryType {
                             validation_data.sources()
                         ));
                     }
- */
+                */
                    Ok(())
                 },
                 _ => Err(String::from("Cannot update or delete a badge class")),
@@ -79,7 +47,14 @@ pub fn entry_def() -> ValidatingEntryType {
                 },
                 validation: | validation_data: hdk::LinkValidationData | {
                     match validation_data {
-                        hdk::LinkValidationData::LinkAdd{ .. } => Ok(()),
+                        hdk::LinkValidationData::LinkAdd { link, .. } => {
+                            let badge: Badge = hdk::utils::get_as_type(link.link.target().clone())?;
+
+                            match badge.badge_class == link.link.base().clone() {
+                                true => Ok(()),
+                                false => Err(String::from("Cannot link \"badge_class->badge\" to a badge that is not the class of the base class"))
+                            }
+                        },
                         _ => Err(String::from("Cannot delete links"))
                     }
                 }
@@ -92,24 +67,18 @@ pub fn entry_def() -> ValidatingEntryType {
                 },
                 validation: | validation_data: hdk::LinkValidationData | {
                     match validation_data {
-                        hdk::LinkValidationData::LinkAdd{ .. } => Ok(()),
+                        hdk::LinkValidationData::LinkAdd { link, .. } => {
+                            let badge_class: BadgeClass = hdk::utils::get_as_type(link.link.target().clone())?;
+
+                            match badge_class.creator_address == link.link.base().clone() {
+                                true => Ok(()),
+                                false => Err(String::from("Cannot link \"creator->badge_class\" to a badge class that was not created by the base address"))
+                            }
+                        },
                         _ => Err(String::from("Cannot delete links"))
                     }
                 }
             )
         ]
     )
-}
-
-pub fn commit_badge_class(badge_class: &Address) -> ZomeApiResult<()> {
-    match hdk::get_entry(badge_class)? {
-        None => Err(ZomeApiError::from(format!(
-            "No badge found for the received address {}",
-            badge_class
-        ))),
-        Some(entry) => {
-            hdk::commit_entry(&entry)?;
-            Ok(())
-        }
-    }
 }
