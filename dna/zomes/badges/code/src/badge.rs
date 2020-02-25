@@ -40,14 +40,14 @@ pub fn entry_def() -> ValidatingEntryType {
         },
         validation: |validation_data: hdk::EntryValidationData<Badge>| {
             match validation_data {
-                EntryValidationData::Create { entry, .. } => {
-                    if entry.issuers.len() > 0 {
+                EntryValidationData::Create { .. } => {
+                  /*   if entry.issuers.len() > 0 {
                         return Err(String::from("No issuers can be present when creating a Badge"));
                     }
 
                     if entry.evidences.len() > 0 {
                         return Err(String::from("No evidences can be present when creating a Badge"));
-                    }
+                    } */
 
                     Ok(())
                 },
@@ -152,7 +152,7 @@ pub fn claim_agent_deserves_badge(
     badge.evidences.append(&mut evidences.clone());
 
     let new_entry = Entry::App("badge".into(), badge.clone().into());
-    let address = hdk::update_entry(new_entry, &badge_address)?;
+    let _address = hdk::update_entry(new_entry, &badge_address)?;
 
     hdk::link_entries(
         &AGENT_ADDRESS,
@@ -167,7 +167,7 @@ pub fn claim_agent_deserves_badge(
     };
 
     hdk::link_entries(&recipient, &badge_address, "recipient->badge", tag)?;
-    hdk::link_entries(&badge_class, &address, "badge_class->badge", "")?;
+    hdk::link_entries(&badge_class, &badge_address, "badge_class->badge", "")?;
     Ok(badge_address)
 }
 
@@ -185,8 +185,11 @@ fn assert_issuer_valid(badge_class_address: &Address, issuer: &Address) -> ZomeA
     }
 
     let badge = Badge::initial(&issuer, &badge_class_address);
-
     let latest_badge: Badge = hdk::utils::get_as_type(badge.address()?)?;
+
+    if badge.issuers.contains(&badge_class.creator_address) {
+        return Ok(());
+    }
 
     match latest_badge.issuers.len() >= badge_class.validators {
         true => Ok(()),

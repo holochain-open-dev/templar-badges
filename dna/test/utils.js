@@ -20,15 +20,27 @@ function claimAgentDeservesBadge(recipient, badgeClass) {
 }
 
 function getEntry(address) {
-  return caller =>
-    caller.call("badges_instance", "badges", "get_entry", {
-      address
-    });
+  return async caller => {
+    const response = await caller.call(
+      "badges_instance",
+      "badges",
+      "get_entry",
+      {
+        address
+      }
+    );
+    return parseEntry(response);
+  };
+}
+
+function parseEntry(response) {
+  const entry = response.Ok ? response.Ok : response;
+  return JSON.parse(entry.App[1]);
 }
 
 function getEntryHistory(address) {
-  return caller => {
-    const entry = caller.call(
+  return async caller => {
+    const response = await caller.call(
       "badges_instance",
       "badges",
       "get_entry_history",
@@ -37,7 +49,7 @@ function getEntryHistory(address) {
       }
     );
 
-    return JSON.parse(entry.Ok.App[1]);
+    return response.Ok.items.map(i => parseEntry(i.entry));
   };
 }
 
