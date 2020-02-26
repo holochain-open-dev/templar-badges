@@ -5,6 +5,8 @@ Holochain zome to issue public badges to anyone following these rules:
 * Anyone can create a new badge, setting the necessary number of claims to achieve the badge
 * Only people with a certain badge can issue it to other people. (Exception: the badge creator can always issue that badge)
 
+> This is a work in progress, not production ready. Contact us if you want to collaborate!
+
 ## Todo list
 
 * [ ] Refactor code not to use `update_entry`
