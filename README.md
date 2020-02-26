@@ -20,3 +20,11 @@ nix-shell
 cd dna
 hc package
 ```
+
+## Tests
+
+```bash
+nix-shell
+cd dna
+hc test
+```
