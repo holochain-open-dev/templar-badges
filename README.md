@@ -8,5 +8,15 @@ Holochain zome to issue public badges to anyone following these rules:
 ## Todo list
 
 * [ ] Refactor code not to use `update_entry`
-* [ ] Implement UI
-* [ ] Publish code
+* [ ] Implement UI native module
+* [ ] Publish code to `npm` and `crates.io`
+
+## Building
+
+Assuming you have [nix-shell](https://developer.holochain.org/docs/install/) installed, to build the DNA, execute:
+
+```bash
+nix-shell
+cd dna
+hc package
+```
